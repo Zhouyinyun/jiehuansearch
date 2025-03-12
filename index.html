@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>界环智能眼镜合作门店搜索</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕶️</text></svg>">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #map-container {
+            width: 100%;
+            height: 600px;
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        .content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+        }
+        .search-section {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .search-section input,
+        .search-section select,
+        .search-section button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .search-section input {
+            flex: 1;
+            min-width: 200px;
+        }
+        .search-section button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .search-section button:hover {
+            background: #0056b3;
+        }
+        .location-info {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .location-tip {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007AFF;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error-message {
+            color: red;
+            text-align: center;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .info-window {
+            padding: 10px;
+            max-width: 300px;
+        }
+        .info-window h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .info-window p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 14px;
+        }
+        .info-window button {
+            margin-top: 10px;
+            padding: 6px 12px;
+            background: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .info-window button:hover {
+            background: #0056b3;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        .header {
+            background: #fff;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .site-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .site-title svg {
+            width: 30px;
+            height: 30px;
+        }
+        
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            min-width: 200px;
+        }
+        
+        .city-select {
+            width: 120px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            background: #fff;
+        }
+        
+        .search-button {
+            padding: 12px 24px;
+            background: #000;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .search-button:hover {
+            background: #333;
+        }
+        
+        #container {
+            display: flex;
+            height: 100vh;
+            padding-top: 140px;
+        }
+        
+        #sidebar {
+            width: 360px;
+            background: #f8f9fa;
+            overflow-y: auto;
+            border-right: 1px solid #dee2e6;
+            padding: 20px;
+        }
+        
+        #map-container {
+            flex: 1;
+            height: 100%;
+        }
+        
+        .store-list {
+            margin-top: 20px;
+        }
+        
+        .store-item {
+            padding: 20px;
+            border-bottom: 1px solid #dee2e6;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .store-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        
+        .store-name {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #000;
+        }
+        
+        .store-address {
+            font-size: 14px;
+            color: #6c757d;
+            line-height: 1.4;
+        }
+        
+        .info-window {
+            padding: 15px;
+        }
+        
+        .info-window h3 {
+            margin-bottom: 10px;
+            color: #000;
+        }
+        
+        .info-window p {
+            margin-bottom: 10px;
+            color: #666;
+        }
+        
+        .info-window button {
+            background: #000;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .info-window button:hover {
+            background: #333;
+        }
+        
+        .store-item-active {
+            background: #e9ecef;
+            border-left: 4px solid #000;
+            transform: translateX(5px);
+        }
+    </style>
+    <!-- 引入高德地图API -->
+    <script type="text/javascript">
+        window._AMapSecurityConfig = {
+            securityJsCode:'6a595920947bfdfad846405ed13adc32',
+        }
+    </script>
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=814aae9f31924f08f0da71c9f4fccc3b&plugin=AMap.Geocoder,AMap.Geolocation,AMap.Scale,AMap.ToolBar,AMap.AutoComplete,AMap.PlaceSearch,AMap.MarkerClusterer"></script>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="site-title">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="30" height="30">
+                    <path fill="black" d="M50 0L6.7 25v50l43.3 25 43.3-25V25L50 0zm0 15l30 17.3v35.4L50 85 20 67.7V32.3L50 15z"/>
+                </svg>
+                界环智能眼镜合作门店搜索
+            </div>
+            <div class="search-bar">
+                <input type="text" id="search-input" class="search-input" placeholder="输入详细地址（如：华庭嘉苑15幢）">
+                <select id="city-select" class="city-select">
+                    <option value="all">全部城市</option>
+                </select>
+                <button id="search-button" class="search-button">搜索地址</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="container">
+        <div id="sidebar">
+            <div id="store-list" class="store-list"></div>
+        </div>
+        <div id="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <div class="contact-info">
+        <button class="contact-button" onclick="copyWechat('13185030972', '传统门店入驻咨询')">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+            </svg>
+            传统门店入驻咨询
+        </button>
+        <button class="contact-button" onclick="copyWechat('13185030972', '用户社群')">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            用户社群
+        </button>
+    </div>
+
+    <footer>
+        <p>© 2024 界环眼镜. All rights reserved.</p>
+    </footer>
+
+    <script src="js/data.js"></script>
+    <script src="js/map.js"></script>
+    <script>
+        // 初始化城市选择器
+        function initCitySelect() {
+            const citySelect = document.getElementById('city-select');
+            
+            // 清空现有选项
+            citySelect.innerHTML = '';
+            
+            // 添加默认选项
+            const defaultOption = document.createElement('option');
+            defaultOption.value = 'all';
+            defaultOption.textContent = '全部城市';
+            citySelect.appendChild(defaultOption);
+
+            // 所有浙江省地级市（按指定顺序）
+            const allCities = [
+                '杭州', '嘉兴', '湖州', '绍兴', '宁波', '衢州',
+                '温州', '台州', '金华', '丽水', '舟山'
+            ];
+
+            // 获取实际有门店的城市列表
+            const citiesWithStores = [...new Set(window.storeData.stores.map(store => store.city))];
+
+            // 添加所有城市
+            allCities.forEach(city => {
+                const option = document.createElement('option');
+                option.value = city;
+                option.textContent = city;
+                
+                // 如果城市暂无门店，添加提示并禁用
+                if (!citiesWithStores.includes(city)) {
+                    option.disabled = true;
+                    option.textContent += '（即将开业）';
+                }
+                
+                citySelect.appendChild(option);
+            });
+        }
+
+        // 更新门店列表
+        function updateStoreList(city) {
+            const storeList = document.getElementById('store-list');
+            storeList.innerHTML = '';
+            
+            const filteredStores = city === 'all' 
+                ? window.storeData.stores 
+                : window.storeData.stores.filter(store => store.city === city);
+            
+            filteredStores.forEach(store => {
+                const div = document.createElement('div');
+                div.className = 'store-item';
+                div.innerHTML = `
+                    <div class="store-name">${store.name}</div>
+                    <div class="store-info">
+                        <div class="store-address">${store.address}</div>
+                        <div class="store-actions">
+                            <button class="location-button" onclick="event.stopPropagation(); copyAndSearch('${store.address}')">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                定位
+                            </button>
+                            <button class="nav-button" onclick="event.stopPropagation(); window.open('https://uri.amap.com/navigation?to=${store.longitude},${store.latitude},${store.name}&mode=car&policy=1&src=mypage&coordinate=gaode&callnative=0')">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2L2 12h4v8h4v-6h4v6h4v-8h4L12 2z"/>
+                                </svg>
+                                导航
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                div.onclick = () => {
+                    if (store.latitude && store.longitude) {
+                        // 关闭之前的信息窗口
+                        if (window.mapUtils.currentInfoWindow) {
+                            window.mapUtils.currentInfoWindow.close();
+                        }
+                        
+                        // 设置地图中心和缩放级别
+                        const position = [store.longitude, store.latitude];
+                        window.mapUtils.map().setZoomAndCenter(15, position, true);
+                        
+                        // 调用地图工具方法显示门店信息
+                        window.mapUtils.showStoreInfo(store);
+                        
+                        // 高亮选中的门店
+                        div.classList.add('store-item-active');
+                        
+                        // 移除其他门店的高亮
+                        document.querySelectorAll('.store-item').forEach(item => {
+                            if (item !== div) {
+                                item.classList.remove('store-item-active');
+                            }
+                        });
+                    }
+                };
+                
+                storeList.appendChild(div);
+            });
+        }
+
+        // 搜索地址
+        function searchAddress(address) {
+            const inputAddress = address || document.getElementById('search-input').value.trim();
+            const city = document.getElementById('city-select').value;
+            
+            if (!inputAddress) {
+                alert('请输入地址');
+                return;
+            }
+            
+            const geocoder = new AMap.Geocoder({
+                city: city === 'all' ? '浙江' : city
+            });
+            
+            geocoder.getLocation(inputAddress, function(status, result) {
+                if (status === 'complete' && result.geocodes.length) {
+                    const location = result.geocodes[0].location;
+                    window.mapUtils.map().setCenter([location.lng, location.lat]);
+                    window.mapUtils.map().setZoom(15);
+                    
+                    // 清除之前的搜索标记
+                    if (window.currentSearchMarker) {
+                        window.currentSearchMarker.setMap(null);
+                    }
+                    
+                    // 添加搜索位置标记
+                    const marker = new AMap.Marker({
+                        position: [location.lng, location.lat],
+                        map: window.mapUtils.map(),
+                        animation: 'AMAP_ANIMATION_DROP',
+                        icon: new AMap.Icon({
+                            size: new AMap.Size(25, 25),
+                            image: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="25" height="25">
+                                    <circle cx="12" cy="12" r="10" fill="#007AFF" stroke="white" stroke-width="2"/>
+                                    <circle cx="12" cy="12" r="3" fill="white"/>
+                                </svg>
+                            `),
+                            imageSize: new AMap.Size(25, 25)
+                        })
+                    });
+                    
+                    // 保存当前搜索标记的引用
+                    window.currentSearchMarker = marker;
+                    
+                    // 添加信息窗体
+                    const infoWindow = new AMap.InfoWindow({
+                        content: `<div class="info-window"><p>${result.geocodes[0].formattedAddress}</p></div>`,
+                        offset: new AMap.Pixel(0, -30)
+                    });
+                    infoWindow.open(window.mapUtils.map(), [location.lng, location.lat]);
+                } else {
+                    alert('地址解析失败，请输入更详细的地址');
+                }
+            });
+        }
+
+        // 复制地址并搜索
+        function copyAndSearch(address) {
+            // 复制地址到剪贴板
+            navigator.clipboard.writeText(address).then(() => {
+                // 将地址填入搜索框
+                document.getElementById('search-input').value = address;
+                // 触发搜索
+                searchAddress(address);
+            }).catch(err => {
+                console.error('复制失败:', err);
+                // 即使复制失败也执行搜索
+                document.getElementById('search-input').value = address;
+                searchAddress(address);
+            });
+        }
+
+        // 初始化地址自动补全
+        function initAutoComplete() {
+            const autoComplete = new AMap.AutoComplete({
+                input: "search-input",
+                city: '浙江',
+                citylimit: true,
+                outPutDirAuto: true
+            });
+
+            // 注册选择事件
+            autoComplete.on('select', function(e) {
+                // 更新输入框的值
+                document.getElementById('search-input').value = e.poi.name;
+                
+                // 自动搜索选中的地址
+                const location = e.poi.location;
+                if (location) {
+                    window.mapUtils.map().setCenter([location.lng, location.lat]);
+                    window.mapUtils.map().setZoom(15);
+                    
+                    // 添加标记
+                    const marker = new AMap.Marker({
+                        position: [location.lng, location.lat],
+                        map: window.mapUtils.map(),
+                        icon: new AMap.Icon({
+                            size: new AMap.Size(25, 25),
+                            image: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="25" height="25">
+                                    <circle cx="12" cy="12" r="10" fill="#007AFF" stroke="white" stroke-width="2"/>
+                                    <circle cx="12" cy="12" r="3" fill="white"/>
+                                </svg>
+                            `),
+                            imageSize: new AMap.Size(25, 25)
+                        })
+                    });
+                }
+            });
+        }
+
+        // 初始化页面
+        window.onload = async function() {
+            // 添加样式到页面
+            document.head.appendChild(style);
+            
+            // 初始化城市选择器
+            initCitySelect();
+            
+            // 初始化地图
+            await window.mapUtils.initMap('map-container');
+            
+            // 初始化地址自动补全
+            initAutoComplete();
+            
+            // 初始化门店列表
+            updateStoreList('all');
+            
+            // 绑定城市选择事件
+            document.getElementById('city-select').addEventListener('change', (e) => {
+                const selectedCity = e.target.value;
+                updateStoreList(selectedCity);
+                
+                // 更新地图上的标记
+                const filteredStores = selectedCity === 'all' 
+                    ? window.storeData.stores 
+                    : window.storeData.stores.filter(store => store.city === selectedCity);
+                
+                window.mapUtils.addStoreMarkers(filteredStores);
+            });
+            
+            // 绑定搜索按钮事件
+            document.getElementById('search-button').addEventListener('click', () => searchAddress());
+            
+            // 绑定回车键搜索
+            document.getElementById('search-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    searchAddress();
+                }
+            });
+        };
+
+        // 复制微信号并提示
+        function copyWechat(wechat, type) {
+            navigator.clipboard.writeText(wechat).then(() => {
+                alert(`微信号已复制到剪贴板！\n请添加微信号：${wechat}\n用途：${type}`);
+            }).catch(err => {
+                alert('复制失败，请手动复制微信号：' + wechat);
+            });
+        }
+
+        // 添加新的样式
+        const style = document.createElement('style');
+        style.textContent = `
+            .store-actions {
+                margin-top: 10px;
+                display: flex;
+                gap: 8px;
+            }
+            
+            .location-button,
+            .nav-button {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: all 0.2s ease;
+            }
+
+            .location-button {
+                background-color: #f5f5f7;
+                color: #1d1d1f;
+                border: 1px solid #d2d2d7;
+            }
+
+            .location-button:hover {
+                background-color: #e5e5e7;
+            }
+            
+            .nav-button {
+                background: #000;
+                color: white;
+                border: none;
+            }
+            
+            .nav-button:hover {
+                background: #333;
+            }
+            
+            .store-item {
+                padding: 20px;
+                border-bottom: 1px solid #dee2e6;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            
+            .store-item:hover {
+                background: #f8f9fa;
+            }
+            
+            .store-name {
+                font-weight: bold;
+                margin-bottom: 8px;
+                color: #000;
+            }
+            
+            .store-address {
+                font-size: 14px;
+                color: #666;
+                margin-bottom: 10px;
+                line-height: 1.4;
+            }
+
+            .store-info {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .info-window {
+                padding: 15px;
+                max-width: 300px;
+            }
+            
+            .info-window h3 {
+                margin-bottom: 10px;
+                color: #000;
+                font-size: 16px;
+            }
+            
+            .info-window p {
+                margin-bottom: 15px;
+                color: #666;
+                font-size: 14px;
+                line-height: 1.4;
+            }
+            
+            .info-window button {
+                background: #000;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-size: 14px;
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .info-window button:hover {
+                background: #333;
+            }
+            
+            .store-item-active {
+                background: #e9ecef;
+                border-left: 4px solid #000;
+                transform: translateX(5px);
+            }
+
+            .contact-info {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                z-index: 1000;
+            }
+
+            .contact-button {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 12px 20px;
+                background-color: #ffffff;
+                border: 1px solid #e5e5e7;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                color: #1d1d1f;
+                font-size: 14px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .contact-button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            }
+
+            .contact-button svg {
+                width: 20px;
+                height: 20px;
+            }
+        `;
+    </script>
+</body>
+</html> 
