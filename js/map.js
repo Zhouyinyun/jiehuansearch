@@ -10,20 +10,12 @@ async function initMap(container) {
             throw new Error('高德地图API未加载');
         }
         
-        // 创建地图实例，优化移动端设置
+        // 创建地图实例
         map = new AMap.Map(container, {
             zoom: 11,
             center: [120.153576, 30.287459], // 杭州市中心
             viewMode: '2D',
-            resizeEnable: true,
-            touchZoom: true,
-            doubleClickZoom: true,
-            keyboardEnable: false,
-            dragEnable: true,
-            zoomEnable: true,
-            rotateEnable: false,
-            showBuildingBlock: true,
-            pitch: 0
+            resizeEnable: true
         });
 
         // 等待地图加载完成
@@ -36,29 +28,11 @@ async function initMap(container) {
 
         console.log('地图实例创建成功');
 
-        // 添加地图控件，优化移动端位置
-        map.addControl(new AMap.Scale({
-            position: 'LB'
+        // 添加地图控件
+        map.addControl(new AMap.Scale());
+        map.addControl(new AMap.ToolBar({
+            position: 'RB'
         }));
-        
-        // 在移动端时不显示工具栏
-        if (window.innerWidth > 768) {
-            map.addControl(new AMap.ToolBar({
-                position: 'RB'
-            }));
-        }
-
-        // 添加定位插件
-        map.plugin('AMap.Geolocation', function() {
-            const geolocation = new AMap.Geolocation({
-                enableHighAccuracy: true,
-                timeout: 10000,
-                buttonPosition: 'RB',
-                buttonOffset: new AMap.Pixel(10, 20),
-                zoomToAccuracy: true
-            });
-            map.addControl(geolocation);
-        });
 
         return true;
     } catch (error) {
@@ -99,7 +73,7 @@ function updateStoreList(stores) {
     
     stores.forEach(store => {
         const div = document.createElement('div');
-        div.className = 'store-card';
+        div.className = 'store-item';
         
         // 提取品牌名称（去掉"界环眼镜-"前缀）
         const brandName = store.name.replace('界环眼镜-', '');
@@ -108,12 +82,10 @@ function updateStoreList(stores) {
             <div class="store-name">${brandName}</div>
             <div class="store-address">${store.address}</div>
             <div class="store-actions">
-                <button class="location-button" onclick="event.stopPropagation(); copyAndSearch('${store.address}')">
-                    <span class="icon">📍</span>
-                    定位
-                </button>
-                <button class="nav-button" onclick="event.stopPropagation(); window.open('https://uri.amap.com/navigation?to=${store.longitude},${store.latitude},${store.name}&mode=car&policy=1&src=mypage&coordinate=gaode&callnative=1')">
-                    <span class="icon">🚗</span>
+                <button class="nav-button" onclick="event.stopPropagation(); window.open('https://uri.amap.com/navigation?to=${store.longitude},${store.latitude},${store.name}&mode=car&policy=1&src=mypage&coordinate=gaode&callnative=0')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 12h4v8h4v-6h4v6h4v-8h4L12 2z"/>
+                    </svg>
                     导航
                 </button>
             </div>
@@ -135,19 +107,11 @@ function updateStoreList(stores) {
                 
                 // 设置地图中心和缩放级别，添加动画效果
                 const position = [store.longitude, store.latitude];
-                currentMap.setStatus({animateEnable: true});
+                currentMap.setStatus({animateEnable: true});  // 启用动画
                 
-                // 移动端时调整地图视图
-                if (window.innerWidth <= 768) {
-                    // 计算偏移以确保标记在视图中心
-                    const offset = currentMap.getSize().height * 0.3;
-                    currentMap.setCenter(position);
-                    currentMap.setZoom(15);
-                    currentMap.panBy(0, -offset);
-                } else {
-                    currentMap.setCenter(position);
-                    currentMap.setZoom(15);
-                }
+                // 先设置中心点，再设置缩放级别
+                currentMap.setCenter(position);
+                currentMap.setZoom(15);
                 
                 // 找到对应的标记并触发动画
                 const marker = markers.find(m => {
@@ -168,10 +132,14 @@ function updateStoreList(stores) {
                 }, 300);
                 
                 // 高亮选中的门店
-                document.querySelectorAll('.store-card').forEach(card => {
-                    card.classList.remove('active');
+                div.classList.add('store-item-active');
+                
+                // 移除其他门店的高亮
+                document.querySelectorAll('.store-item').forEach(item => {
+                    if (item !== div) {
+                        item.classList.remove('store-item-active');
+                    }
                 });
-                div.classList.add('active');
             }
         };
         
@@ -337,56 +305,67 @@ function clearMarkers() {
     markers = [];
 }
 
-// 显示门店信息窗口
-function showStoreInfo(store) {
-    if (!map) return;
+// 处理定位按钮点击
+async function handleLocationClick(address) {
+    try {
+        // 创建一个临时输入框
+        const tempInput = document.createElement('textarea');
+        tempInput.value = address;
+        document.body.appendChild(tempInput);
 
-    // 关闭之前的信息窗口
-    if (window.mapUtils.currentInfoWindow) {
-        window.mapUtils.currentInfoWindow.close();
+        // 在移动端，使用 execCommand 可能不被支持，所以我们使用新的 API
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(address);
+            showToast('地址已复制到剪贴板');
+        } else {
+            // 回退方案
+            tempInput.select();
+            document.execCommand('copy');
+            showToast('地址已复制到剪贴板');
+        }
+
+        document.body.removeChild(tempInput);
+
+        // 尝试打开高德地图
+        const mapUrl = `https://uri.amap.com/marker?position=${store.lng},${store.lat}&name=${encodeURIComponent(store.name)}&src=myapp&coordinate=gaode&callnative=1`;
+        window.location.href = mapUrl;
+    } catch (err) {
+        console.error('复制地址失败:', err);
+        showToast('复制地址失败，请手动复制');
     }
-
-    // 创建信息窗口内容
-    const content = `
-        <div class="info-window">
-            <h3>${store.name}</h3>
-            <p>${store.address}</p>
-            <div class="info-actions">
-                <button onclick="window.open('https://uri.amap.com/navigation?to=${store.longitude},${store.latitude},${store.name}&mode=car&policy=1&src=mypage&coordinate=gaode&callnative=1')">
-                    <span class="icon">🚗</span>
-                    导航到这里
-                </button>
-            </div>
-        </div>
-    `;
-
-    // 创建信息窗口
-    const infoWindow = new AMap.InfoWindow({
-        content: content,
-        offset: new AMap.Pixel(0, -30),
-        closeWhenClickMap: true
-    });
-
-    // 打开信息窗口
-    infoWindow.open(map, [store.longitude, store.latitude]);
-
-    // 保存当前信息窗口引用
-    window.mapUtils.currentInfoWindow = infoWindow;
 }
 
-// 复制并搜索地址
-function copyAndSearch(address) {
-    // 复制地址到剪贴板
-    const textarea = document.createElement('textarea');
-    textarea.value = address;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
-    
-    // 将地址填入搜索框并触发搜索
-    document.getElementById('search-input').value = address;
-    searchAddress(address);
+// 显示提示信息
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast-message';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    // 2秒后移除提示
+    setTimeout(() => {
+        document.body.removeChild(toast);
+    }, 2000);
+}
+
+// 修改 showStoreInfo 函数
+function showStoreInfo(store) {
+    const storeList = document.getElementById('store-list');
+    const storeElement = document.createElement('div');
+    storeElement.className = 'store-item';
+    storeElement.innerHTML = `
+        <h3>${store.name}</h3>
+        <p>${store.address}</p>
+        <div class="store-actions">
+            <button class="location-btn" onclick="handleLocationClick('${store.address}')">
+                <span class="icon">📍</span> 定位
+            </button>
+            <button class="navigation-btn" onclick="window.location.href='https://uri.amap.com/marker?position=${store.lng},${store.lat}&name=${encodeURIComponent(store.name)}&src=myapp&coordinate=gaode&callnative=1'">
+                <span class="icon">🗺️</span> 导航
+            </button>
+        </div>
+    `;
+    storeList.appendChild(storeElement);
 }
 
 // 导出函数
