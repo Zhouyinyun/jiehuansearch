@@ -211,4 +211,60 @@ footer {
     20% { opacity: 1; transform: translate(-50%, 0); }
     80% { opacity: 1; transform: translate(-50%, 0); }
     100% { opacity: 0; transform: translate(-50%, -20px); }
+}
+
+/* 信息窗口样式 */
+.info-window {
+    padding: 15px;
+    min-width: 200px;
+}
+
+.info-window h3 {
+    font-size: 16px;
+    color: #1d1d1f;
+    margin-bottom: 8px;
+}
+
+.info-window p {
+    font-size: 14px;
+    color: #86868b;
+    margin-bottom: 12px;
+}
+
+.info-window .store-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.info-window .location-btn,
+.info-window .navigation-btn {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: all 0.3s ease;
+}
+
+.info-window .location-btn {
+    background: #f5f5f7;
+    color: #1d1d1f;
+}
+
+.info-window .navigation-btn {
+    background: #0071e3;
+    color: white;
+}
+
+.info-window .location-btn:hover {
+    background: #e5e5e7;
+}
+
+.info-window .navigation-btn:hover {
+    background: #0077ed;
 } 
